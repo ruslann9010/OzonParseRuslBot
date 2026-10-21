@@ -7,18 +7,12 @@ from typing import Optional, Any
 
 logger = logging.getLogger(__name__)
 
-
 class OzBrowserClient:
 
     def __init__(self) -> None:
-        """ Инициализация внутренних полей класса.
-        Здесь вы просто объявляете переменные, которые изначально равны None,
-        чтобы затем сохранить в них запущенные процессы браузера.
-        """
         self._playwright: Optional[Any] = None
         self.browser: Optional[Browser] = None
         self.context: Optional[BrowserContext] = None
-
 
     async def init_browser(self) -> Page:
         """ Launches the browser instance, configures anti-detection headers,
@@ -45,7 +39,6 @@ class OzBrowserClient:
         
         page = await self.context.new_page()
         return page 
-
 
     async def close_browser(self) -> None:
         """ Gracefully closes context, browser process, and stops the main Playwright loop.
