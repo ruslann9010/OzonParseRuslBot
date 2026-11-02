@@ -2,9 +2,10 @@ import sys
 import asyncio
 import logging
 
-from browser import OzBrowserClient  # type: ignore
+from browser_manager import BrowserManager
 from parser import OzParserClient  # type: ignore
 from database import DataBaseDb  # type: ignore
+from queue_manager import RedisQueueManager
 
 def setup_logging() -> None:
     """ Configures standard logging to display clean, 
@@ -22,15 +23,20 @@ async def main() -> None:
     """
     setup_logging()
     logging.info("Starting Ozon Scraper Application")
+
     await DataBaseDb.init_db()
-    browser_client = OzBrowserClient()
+    queue = RedisQueueManager()
+    browser_client = BrowserManager()
     parser_client = OzParserClient(browser_client=browser_client)
-    search_query = "ноутбук"
-    logging.info(f"Triggering search parser for query: '{search_query}'")
-    results = await parser_client.parse_results(query=search_query)
-    for item in results:
-        await DataBaseDb.save_or_update_product(item)
-    logging.info("Application finished successfully.")
+
+    try:
+        results = await parser_client.parse_results("ноутбук")
+        
+        for item in results:
+            await queue.push_product(item)  
+    finally:
+        await browser_client.close()
+        await queue.close()
 
 
 if __name__ == "__main__":

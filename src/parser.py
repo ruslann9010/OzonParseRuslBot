@@ -1,10 +1,10 @@
 import logging
-import asyncio
-from random import randint
 from typing import Optional
 from playwright.async_api import Page
 
-from browser import OzBrowserClient  # type: ignore
+
+from browser_manager import BrowserManager
+from network_utils import safe_goto
 
 
 logger = logging.getLogger(__name__)
@@ -13,29 +13,32 @@ class OzParserClient:
     """ Main business logic layer for scraping data from Ozon.
     """
 
-    def __init__(self, browser_client: OzBrowserClient) -> None:
-        self.client = browser_client
+    def __init__(self, browser_client: BrowserManager) -> None:
+        self.browser_manager = browser_client
         self.page: Optional[Page] = None
 
-    async def _human_delay(self) -> None:
-        await asyncio.sleep(randint(2, 5))    
 
     async def parse_results(self, query: str) -> list[dict]:
-        """ Searches for a specific query, waits for elements to load, and extracts data.
-        """
+      
         parsed_data: list[dict] = []
-        self.page = await self.client.init_browser()
+        context = await self.browser_manager.create_context()
+        self.page = await context.new_page()
         if not self.page:
             logger.error("Ошибка: Браузер не смог инициализировать страницу")
-            return []
+            return [] 
+        succes = await safe_goto(self.page, query)
+        if not succes:
+            logger.error("Ошибка!!!!!!!!!!!!")
+            await self.browser_manager.close()
+            return[]
         try:
-            url = f"https://ozon.ru/search/?text={query}&from_global=true"
-            logger.info(f"Navigating to search page for query: '{query}'")
-            await self.page.goto(url, wait_until='networkidle', timeout=60000)
-            await self._human_delay()
+            await self.page.wait_for_load_state("networkidle")
+            try:
+                await self.page.wait_for_selector('div[class^="tile-root"]', timeout=5000)
+            except Exception:
+                logger.warning("Карточки товаров не появились на странице за 5 секунд.")
             card_locator = self.page.locator('div[class^="tile-root"]')
             cards = await card_locator.element_handles()
-
             for index, card in enumerate(cards, start=1):
                 try:
                     title_element = await card.query_selector('span.tsBody500Medium')
@@ -63,5 +66,5 @@ class OzParserClient:
         except Exception as e:
             logger.error(f"Error occurred during parsing process: {e}")
         finally:
-            await self.client.close_browser()
+            await self.browser_manager.close()
         return parsed_data
