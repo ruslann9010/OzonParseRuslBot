@@ -1,3 +1,5 @@
+"""Ozon marketplace scraping client for extracting product listings."""
+
 import logging
 from typing import Optional
 from playwright.async_api import Page
@@ -10,16 +12,44 @@ from network_utils import safe_goto
 logger = logging.getLogger(__name__)
 
 class OzParserClient:
-    """ Main business logic layer for scraping data from Ozon.
+    """Main business logic layer for scraping product data from Ozon.
+
+    Coordinates browser context creation, safe page navigation, DOM element
+    extraction, and structuring of scraped product listings.
+
+    Attributes:
+        browser_manager (BrowserManager): Manager responsible for browser and
+            context lifecycle.
+        page (Optional[Page]): Active Playwright page instance used during a
+            scraping session.
     """
 
     def __init__(self, browser_client: BrowserManager) -> None:
+        """Initializes the Ozon parser client with a browser manager.
+
+        Args:
+            browser_client: Configured ``BrowserManager`` instance used to
+                create isolated browser contexts.
+        """
         self.browser_manager = browser_client
         self.page: Optional[Page] = None
 
 
     async def parse_results(self, query: str) -> list[dict]:
-      
+        """Navigates to Ozon search results for a query and extracts product cards.
+
+        Creates a new browser context and page, loads the search results page,
+        waits for product tile elements to render, and parses each card's
+        title, price, and URL into a structured dictionary.
+
+        Args:
+            query: Search phrase or product keyword to look up on Ozon.
+
+        Returns:
+            A list of dictionaries, where each dictionary represents a scraped
+            product (containing keys such as title, price, and url).
+            Returns an empty list if navigation fails or no items are found.
+        """
         parsed_data: list[dict] = []
         context = await self.browser_manager.create_context()
         self.page = await context.new_page()

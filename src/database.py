@@ -11,7 +11,7 @@ class DataBaseDb:
     """
 
     @staticmethod
-    async def init_db():
+    async def init_db() -> None:
         """Initializes the database by creating the required tables if they do not exist.
         
         Creates the 'products' table with a schema tailored for storing scraped
@@ -30,7 +30,7 @@ class DataBaseDb:
 
 
     @staticmethod
-    async def save_or_update_product(product_data: dict):
+    async def save_or_update_product(product_data: dict) -> None:
         """Saves a new product to the database or updates its price if it already exists.
         
         This method parses raw product attributes (cleaning the price string into 
@@ -58,3 +58,34 @@ class DataBaseDb:
                     updated_at = excluded.updated_at
             """, (product_id, product_data['title'], clean_price, url, current_time))
             await db.commit()
+
+
+
+    @staticmethod
+    async def get_products_by_query(query: str, limit: int = 10) -> list[dict]:
+        """Retrieves stored products matching a search query, ordered by lowest price.
+
+        Connects to the SQLite database asynchronously and performs a case-insensitive
+        partial match search against product titles, returning the cheapest items
+        up to the specified limit.
+
+        Args:
+            query: Search keyword or phrase to filter product titles.
+            limit: Maximum number of product records to return. Defaults to 10.
+
+        Returns:
+            A list of dictionaries representing matching product rows, each
+            containing title, price, url, and updated_at keys.
+        """
+        async with aiosqlite.connect("database.db") as db:
+            db.row_factory = aiosqlite.Row
+            sql = """
+                SELECT title, price, url, updated_at
+                FROM products
+                WHERE title LIKE ?
+                ORDER BY price ASC
+                LIMIT ?
+            """
+            async with db.execute(sql, (f"%{query}%", limit)) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(row) for row in rows]

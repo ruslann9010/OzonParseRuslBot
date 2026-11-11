@@ -13,3 +13,5 @@ class Config:
     PROXY_SERVER = os.getenv("PROXY_SERVER", None)
     USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
     VIEWPORT = {"width": 1920, "height": 1080}  
+    TOKEN_BOT = os.getenv("BOT_TOKEN")
+    TASKS_QUEUE = "ozon_search_tasks"

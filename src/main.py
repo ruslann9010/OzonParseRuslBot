@@ -19,24 +19,37 @@ def setup_logging() -> None:
                 logging.StreamHandler(sys.stdout)])
 
 async def main() -> None:
-    """ Application entry point. Coordinates initialization and triggers the parser.
+    """ Application entry point. 
+    
+    Coordinates initialization and triggers the parser.
     """
     setup_logging()
     logging.info("Starting Ozon Scraper Application")
-
     await DataBaseDb.init_db()
-    queue = RedisQueueManager()
-    browser_client = BrowserManager()
-    parser_client = OzParserClient(browser_client=browser_client)
+    queue_manager = RedisQueueManager()
+    await queue_manager.connect()
 
     try:
-        results = await parser_client.parse_results("ноутбук")
-        
-        for item in results:
-            await queue.push_product(item)  
+        while True:
+            task = await queue_manager.get_search_task()
+            if not task: continue
+            query = task["query"] 
+            chat_id = task["chat_id"]
+            logging.info(f"Получена задача на парсинг: '{query}' для чата {chat_id}")
+            browser_client = BrowserManager()
+            parser_client = OzParserClient(browser_client=browser_client)
+            try:
+                results = await parser_client.parse_results(query)
+                for item in results:
+                    await queue_manager.push_product(item)  
+            except Exception as e:
+                logging.error(f"Ошибка при парсинге запроса '{query}': {e}")  
+            finally:
+                await browser_client.close()          
+    except  asyncio.CancelledError:
+        logging.info("Воркер парсера остановлен.")
     finally:
-        await browser_client.close()
-        await queue.close()
+        await queue_manager.close()
 
 
 if __name__ == "__main__":
